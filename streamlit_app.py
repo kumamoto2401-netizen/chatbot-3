@@ -3,7 +3,11 @@ import requests
 
 # タイトルと説明の表示
 st.title("💬 Gemini チャットボット")
-st.write("このシンプルなチャットボットは、Google の Gemini API を利用して応答を生成します。 ")
+st.write(
+    "このシンプルなチャットボットは、Google の Gemini API を利用して応答を生成します。 "
+    "利用するには、Streamlit Secrets を通じて Gemini API キーを設定する必要があります。 "
+    "Streamlit Secrets の詳細については [こちらのドキュメント](https://docs.streamlit.io/develop/concepts/connections/secrets-management) をご覧ください。"
+)
 
 # Streamlit Community CloudのSecretsからAPIキーを取得
 # .streamlit/secrets.toml に GEMINI_API_KEY = "YOUR_API_KEY" を設定してください
@@ -12,7 +16,7 @@ gemini_api_key = st.secrets.get("GEMINI_API_KEY")
 if not gemini_api_key:
     st.info("Streamlit Community CloudのSecretsに `GEMINI_API_KEY` を設定してください。", icon="🗝️")
 else:
-    # ユーザーがモデルを選択できるようにする（正しいモデル名表記を使用）
+    # ユーザーがモデルを選択できるようにする
     model_name = st.selectbox(
         "使用する Gemini モデルを選択",
         (
@@ -20,16 +24,13 @@ else:
             "gemini-2.5-pro"
         )
     )
-    st.write(f"現在のモデル: **{model_name}**") # 選択中のモデルを表示
+    st.write(f"現在のモデル: **{model_name}**")
 
     if "messages" not in st.session_state:
-        # 初期のメッセージリストをセッションステートに作成
         st.session_state.messages = []
 
     # 既存のチャットメッセージを表示
     for message in st.session_state.messages:
-        # roleに応じて日本語で表示
-        display_role = "ユーザー" if message["role"] == "user" else "アシスタント"
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
@@ -41,10 +42,9 @@ else:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Gemini API用にメッセージ形式を準備（ロールを "user" または "model" に変換）
+        # Gemini API用にメッセージ形式を準備
         gemini_messages = []
         for m in st.session_state.messages:
-            # StreamlitのロールをAPIのロールにマッピング
             api_role = "user" if m["role"] == "user" else "model"
             gemini_messages.append(
                 {
@@ -53,15 +53,22 @@ else:
                 }
             )
 
-        # Gemini API endpoint
-        api_url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={gemini_api_key}"
+        # APIキーを含まないクリーンなURLを定義 (セキュリティ対応済み)
+        api_url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent"
 
-        headers = {"Content-Type": "application/json"}
+        # ヘッダーに Content-Type と APIキーを含める (セキュリティ対応済み)
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": gemini_api_key 
+        }
+        
+        # ★★★ 修正点: maxOutputTokens の指定を削除 ★★★
         data = {
             "contents": gemini_messages,
             "generationConfig": {
                 "temperature": 0.7,
                 "topP": 0.8
+                # maxOutputTokens はデフォルト値 (8192 など) が適用される
             }
         }
 
@@ -75,15 +82,19 @@ else:
                     result = response.json()
                     
                     # APIからのレスポンス構造のチェックと応答の取得
-                    if "candidates" in result and result["candidates"] and \
-                       "content" in result["candidates"][0] and \
-                       "parts" in result["candidates"][0]["content"] and \
-                       result["candidates"][0]["content"]["parts"]:
+                    if "candidates" in result and result["candidates"]:
+                        candidate = result["candidates"][0]
                         
-                        gemini_reply = result["candidates"][0]["content"]["parts"][0]["text"]
+                        # トークン上限超過のエラーハンドリングを維持
+                        if candidate.get("finishReason") == "MAX_TOKENS":
+                            gemini_reply = f"応答が途中で終了しました（トークン上限超過）。モデルの最大出力が尽きた可能性があります。"
+                        elif "content" in candidate and "parts" in candidate["content"] and candidate["content"]["parts"]:
+                            gemini_reply = candidate["content"]["parts"][0]["text"]
+                        else:
+                            # その他の予期しない応答形式
+                            gemini_reply = f"エラー: 予期しないAPI応答形式です。詳細: {result}"
                     else:
-                        # 予期しないレスポンス形式の場合
-                        gemini_reply = f"エラー: 予期しないAPI応答形式です。{result}"
+                        gemini_reply = f"エラー: 応答に候補が見つかりませんでした。詳細: {result}"
 
                     st.markdown(gemini_reply)
             
