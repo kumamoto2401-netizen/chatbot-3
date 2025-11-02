@@ -3,11 +3,7 @@ import requests
 
 # タイトルと説明の表示
 st.title("💬 Gemini チャットボット")
-st.write(
-    "このシンプルなチャットボットは、Google の Gemini API を利用して応答を生成します。 "
-    "利用するには、Streamlit Secrets を通じて Gemini API キーを設定する必要があります。 "
-    "Streamlit Secrets の詳細については [こちらのドキュメント](https://docs.streamlit.io/develop/concepts/connections/secrets-management) をご覧ください。"
-)
+st.write("このシンプルなチャットボットは、Google の Gemini API を利用して応答を生成します。")
 
 # Streamlit Community CloudのSecretsからAPIキーを取得
 # .streamlit/secrets.toml に GEMINI_API_KEY = "YOUR_API_KEY" を設定してください
