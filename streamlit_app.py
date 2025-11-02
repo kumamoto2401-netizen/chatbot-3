@@ -2,19 +2,19 @@ import streamlit as st
 import requests
 
 # Show title and description.
-st.title("💬 Chatbot")
+st.title("💬 Chatbot (Gemini Flash)")
 st.write(
-    "This is a simple chatbot that uses Google's Gemini API to generate responses. "
-    "To use this app, you need to provide a Gemini API key, which you can get from your Google Cloud Console. "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
+    "This is a simple chatbot that uses Google's Gemini API (gemini-flash-2.5) to generate responses. "
+    "To use this app, you need to provide a Gemini API key via Streamlit Secrets. "
+    "Learn more about [Streamlit Secrets](https://docs.streamlit.io/develop/concepts/connections/secrets-management)."
 )
 
-# Ask user for their Gemini API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-gemini_api_key = st.text_input("Gemini API Key", type="password")
+# Streamlit Community CloudのSecretsからAPIキーを取得
+# .streamlit/secrets.toml に GEMINI_API_KEY = "YOUR_API_KEY" を設定してください
+gemini_api_key = st.secrets.get("GEMINI_API_KEY")
+
 if not gemini_api_key:
-    st.info("Please add your Gemini API key to continue.", icon="🗝️")
+    st.info("Streamlit Community CloudのSecretsに `GEMINI_API_KEY` を設定してください。", icon="🗝️")
 else:
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -24,8 +24,7 @@ else:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
+    # Create a chat input field to allow the user to enter a message.
     if prompt := st.chat_input("What is up?"):
 
         # Store and display the current prompt.
@@ -43,8 +42,8 @@ else:
                 }
             )
 
-        # Gemini API endpoint
-        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key={gemini_api_key}"
+        # Gemini API endpoint (モデル名を gemini-flash-2.5 に変更)
+        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-flash-2.5:generateContent?key={gemini_api_key}"
 
         headers = {"Content-Type": "application/json"}
         data = {
@@ -57,13 +56,37 @@ else:
         }
 
         try:
-            response = requests.post(api_url, headers=headers, json=data, timeout=30)
-            response.raise_for_status()
-            result = response.json()
-            gemini_reply = result["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception as e:
-            gemini_reply = f"API Error: {e}"
+            # Display assistant response in chat message container
+            with st.chat_message("assistant"):
+                with st.spinner("Generating response..."):
+                    response = requests.post(api_url, headers=headers, json=data, timeout=30)
+                    response.raise_for_status() # エラーがあれば例外を発生
+                    
+                    result = response.json()
+                    
+                    # APIからのレスポンス構造のチェック
+                    if "candidates" in result and result["candidates"] and \
+                       "content" in result["candidates"][0] and \
+                       "parts" in result["candidates"][0]["content"] and \
+                       result["candidates"][0]["content"]["parts"]:
+                        
+                        gemini_reply = result["candidates"][0]["content"]["parts"][0]["text"]
+                    else:
+                        # 予期しないレスポンス形式の場合
+                        gemini_reply = f"Error: Unexpected API response format. {result}"
 
-        with st.chat_message("assistant"):
-            st.markdown(gemini_reply)
-        st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
+                    st.markdown(gemini_reply)
+            
+            # Store the assistant's response.
+            st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"API Request Error: {e}")
+            gemini_reply = f"API Request Error: {e}"
+            # エラー時もセッションに保存（オプション）
+            # st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
+        except Exception as e:
+            st.error(f"An unexpected error occurred: {e}")
+            gemini_reply = f"An unexpected error occurred: {e}"
+            # エラー時もセッションに保存（オプション）
+            # st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
