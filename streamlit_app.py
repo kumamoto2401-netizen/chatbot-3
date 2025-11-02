@@ -64,7 +64,7 @@ else:
         data = {
             "contents": gemini_messages,
             "generationConfig": {
-                "maxOutputTokens": 1024,
+                "maxOutputTokens": 4096,
                 "temperature": 0.7,
                 "topP": 0.8
             }
