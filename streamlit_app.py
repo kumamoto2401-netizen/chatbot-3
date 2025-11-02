@@ -44,7 +44,7 @@ else:
             )
 
         # Gemini API endpoint
-        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={gemini_api_key}"
+        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key={gemini_api_key}"
 
         headers = {"Content-Type": "application/json"}
         data = {
