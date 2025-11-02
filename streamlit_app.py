@@ -43,7 +43,7 @@ else:
             )
 
         # Gemini API endpoint (モデル名を gemini-flash-2.5 に変更)
-        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-flash-2.5:generateContent?key={gemini_api_key}"
+        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
 
         headers = {"Content-Type": "application/json"}
         data = {
