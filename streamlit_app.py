@@ -49,16 +49,15 @@ else:
                 }
             )
 
-        # APIキーを含まないクリーンなURLを定義 (セキュリティ対応済み)
+        # APIキーを含まないクリーンなURLを定義
         api_url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent"
 
-        # ヘッダーに Content-Type と APIキーを含める (セキュリティ対応済み)
+        # ヘッダーに Content-Type と APIキーを含める
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": gemini_api_key 
         }
         
-        # ★★★ 修正点: maxOutputTokens の指定を削除 ★★★
         data = {
             "contents": gemini_messages,
             "generationConfig": {
