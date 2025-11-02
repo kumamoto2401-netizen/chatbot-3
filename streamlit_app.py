@@ -1,51 +1,58 @@
 import streamlit as st
 import requests
 
-# Show title and description.
-st.title("💬 Chatbot (Gemini)")
+# タイトルと説明の表示
+st.title("💬 Gemini チャットボット")
 st.write(
-    "This is a simple chatbot that uses Google's Gemini API to generate responses. "
-    "To use this app, you need to provide a Gemini API key via Streamlit Secrets. "
-    "Learn more about [Streamlit Secrets](https://docs.streamlit.io/develop/concepts/connections/secrets-management)."
+    "このシンプルなチャットボットは、Google の Gemini API を利用して応答を生成します。 "
+    "利用するには、Streamlit Secrets を通じて Gemini API キーを設定する必要があります。 "
+    "Streamlit Secrets の詳細については [こちらのドキュメント](https://docs.streamlit.io/develop/concepts/connections/secrets-management) をご覧ください。"
 )
 
 # Streamlit Community CloudのSecretsからAPIキーを取得
+# .streamlit/secrets.toml に GEMINI_API_KEY = "YOUR_API_KEY" を設定してください
 gemini_api_key = st.secrets.get("GEMINI_API_KEY")
 
 if not gemini_api_key:
     st.info("Streamlit Community CloudのSecretsに `GEMINI_API_KEY` を設定してください。", icon="🗝️")
 else:
+    # ユーザーがモデルを選択できるようにする（正しいモデル名表記を使用）
     model_name = st.selectbox(
-        "Select Gemini Model",
+        "使用する Gemini モデルを選択",
         (
-            "gemini-2.5-flash",
+            "gemini-2.5-flash", 
             "gemini-2.5-pro"
         )
     )
-    st.write(f"Current model: **{model_name}**") # 選択中のモデルを表示
+    st.write(f"現在のモデル: **{model_name}**") # 選択中のモデルを表示
 
     if "messages" not in st.session_state:
+        # 初期のメッセージリストをセッションステートに作成
         st.session_state.messages = []
 
-    # Display the existing chat messages via `st.chat_message`.
+    # 既存のチャットメッセージを表示
     for message in st.session_state.messages:
+        # roleに応じて日本語で表示
+        display_role = "ユーザー" if message["role"] == "user" else "アシスタント"
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Create a chat input field to allow the user to enter a message.
-    if prompt := st.chat_input("What is up?"):
+    # ユーザーがメッセージを入力するためのチャット入力フィールド
+    if prompt := st.chat_input("ここにメッセージを入力"):
 
-        # Store and display the current prompt.
+        # ユーザーのプロンプトを保存・表示
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Prepare messages for Gemini API (convert roles to Gemini format)
+        # Gemini API用にメッセージ形式を準備（ロールを "user" または "model" に変換）
         gemini_messages = []
         for m in st.session_state.messages:
+            # StreamlitのロールをAPIのロールにマッピング
+            api_role = "user" if m["role"] == "user" else "model"
             gemini_messages.append(
                 {
-                    "role": "user" if m["role"] == "user" else "model",
+                    "role": api_role,
                     "parts": [{"text": m["content"]}]
                 }
             )
@@ -64,15 +71,15 @@ else:
         }
 
         try:
-            # Display assistant response in chat message container
+            # アシスタントの応答をチャットメッセージコンテナ内に表示
             with st.chat_message("assistant"):
-                with st.spinner(f"Generating response using {model_name}..."):
+                with st.spinner(f"{model_name} が応答を生成中..."):
                     response = requests.post(api_url, headers=headers, json=data, timeout=30)
-                    response.raise_for_status() # エラーがあれば例外を発生
+                    response.raise_for_status() # HTTPエラーがあれば例外を発生
                     
                     result = response.json()
                     
-                    # APIからのレスポンス構造のチェック
+                    # APIからのレスポンス構造のチェックと応答の取得
                     if "candidates" in result and result["candidates"] and \
                        "content" in result["candidates"][0] and \
                        "parts" in result["candidates"][0]["content"] and \
@@ -81,16 +88,18 @@ else:
                         gemini_reply = result["candidates"][0]["content"]["parts"][0]["text"]
                     else:
                         # 予期しないレスポンス形式の場合
-                        gemini_reply = f"Error: Unexpected API response format. {result}"
+                        gemini_reply = f"エラー: 予期しないAPI応答形式です。{result}"
 
                     st.markdown(gemini_reply)
             
-            # Store the assistant's response.
+            # アシスタントの応答をセッションステートに保存
             st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
 
         except requests.exceptions.RequestException as e:
-            st.error(f"API Request Error: {e}")
-            gemini_reply = f"API Request Error: {e}"
+            error_message = f"APIリクエストエラーが発生しました: {e}"
+            st.error(error_message)
+            st.session_state.messages.append({"role": "assistant", "content": error_message})
         except Exception as e:
-            st.error(f"An unexpected error occurred: {e}")
-            gemini_reply = f"An unexpected error occurred: {e}"
+            error_message = f"予期せぬエラーが発生しました: {e}"
+            st.error(error_message)
+            st.session_state.messages.append({"role": "assistant", "content": error_message})
