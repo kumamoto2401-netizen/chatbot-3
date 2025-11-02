@@ -2,20 +2,28 @@ import streamlit as st
 import requests
 
 # Show title and description.
-st.title("💬 Chatbot (Gemini Flash)")
+st.title("💬 Chatbot (Gemini)")
 st.write(
-    "This is a simple chatbot that uses Google's Gemini API (gemini-flash-2.5) to generate responses. "
+    "This is a simple chatbot that uses Google's Gemini API to generate responses. "
     "To use this app, you need to provide a Gemini API key via Streamlit Secrets. "
     "Learn more about [Streamlit Secrets](https://docs.streamlit.io/develop/concepts/connections/secrets-management)."
 )
 
 # Streamlit Community CloudのSecretsからAPIキーを取得
-# .streamlit/secrets.toml に GEMINI_API_KEY = "YOUR_API_KEY" を設定してください
 gemini_api_key = st.secrets.get("GEMINI_API_KEY")
 
 if not gemini_api_key:
     st.info("Streamlit Community CloudのSecretsに `GEMINI_API_KEY` を設定してください。", icon="🗝️")
 else:
+    model_name = st.selectbox(
+        "Select Gemini Model",
+        (
+            "gemini-2.5-flash",
+            "gemini-2.5-pro"
+        )
+    )
+    st.write(f"Current model: **{model_name}**") # 選択中のモデルを表示
+
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -42,8 +50,8 @@ else:
                 }
             )
 
-        # Gemini API endpoint (モデル名を gemini-flash-2.5 に変更)
-        api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
+        # Gemini API endpoint (選択された model_name 変数を使用)
+        api_url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={gemini_api_key}"
 
         headers = {"Content-Type": "application/json"}
         data = {
@@ -58,7 +66,7 @@ else:
         try:
             # Display assistant response in chat message container
             with st.chat_message("assistant"):
-                with st.spinner("Generating response..."):
+                with st.spinner(f"Generating response using {model_name}..."):
                     response = requests.post(api_url, headers=headers, json=data, timeout=30)
                     response.raise_for_status() # エラーがあれば例外を発生
                     
@@ -83,10 +91,6 @@ else:
         except requests.exceptions.RequestException as e:
             st.error(f"API Request Error: {e}")
             gemini_reply = f"API Request Error: {e}"
-            # エラー時もセッションに保存（オプション）
-            # st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
         except Exception as e:
             st.error(f"An unexpected error occurred: {e}")
             gemini_reply = f"An unexpected error occurred: {e}"
-            # エラー時もセッションに保存（オプション）
-            # st.session_state.messages.append({"role": "assistant", "content": gemini_reply})
